@@ -5,6 +5,11 @@ const app = express();
 require("dotenv").config();
 const port = process.env.PORT || 8000;
 
+
+const stripe = require("stripe")(
+  `${process.env.STRIPE_SK}`
+);
+
 app.use(cors());
 app.use(express.json());
 
@@ -26,6 +31,7 @@ async function run() {
     const user = db.collection("user");
     const marqe = db.collection("marqe");
     const allPhoto = db.collection("allphoto");
+    const priceing = db.collection("priceing");
 
     // *************get data **************************************************
     // user get
@@ -33,6 +39,11 @@ async function run() {
       const useremail = req.query.email;
       const query = { email: useremail };
       const result = await allPhoto.find(query).toArray();
+      res.send(result);
+    });
+    // priceing get
+    app.get("/priceing", async (req, res) => {
+      const result = await priceing.find({}).toArray();
       res.send(result);
     });
     // user get
@@ -54,6 +65,21 @@ async function run() {
       const result = await user.insertOne(data);
       res.send(result);
     });
+
+    //  post user google
+    app.post("/postGoogle", async (req, res) => {
+      const data = req.body;
+      const emailD =(data?.email);
+      const query = {email : emailD}
+      const axd = await user.findOne(query);
+      
+      if(axd){
+        return res.send('ok');
+      }
+      const result = await user.insertOne(data);
+      res.send(result);
+    });
+
     // post image
     app.post("/postImage", async (req, res) => {
       const data = req.body;
@@ -99,6 +125,36 @@ async function run() {
       };
       const result = await user.updateOne(query, updaterev, option);
       res.send(result);
+    });
+
+
+    app.put('/update/:id' , async(req , res)=>{
+      const id = req.params.id;
+      const {name} = req.body;
+      const filter = {_id : new ObjectId(id)}
+      const option = {upsert : true}
+      const updateUser ={
+        $set :{
+          type : name
+        }
+      }
+      const result = await user.updateOne(filter ,updateUser ,option )
+      res.send(result)
+    })
+
+
+    // **************************** payment****************
+    app.post("/create-payment-intent", async (req, res) => {
+      const product = req.body;
+      const amount = parseInt(product.price) * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "inr",
+        payment_method_types: ["card"],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
   } finally {
   }
